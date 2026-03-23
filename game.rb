@@ -1,16 +1,26 @@
 # Game class handles the main simulation logic
-# Controls player turns, movement, property logic, and game termination
+# Refactored for extensibility:
+# - Configurable players
+# - Separated business rules (Rules class)
+# - Config-driven settings
 
 require_relative "player"
 require_relative "board"
+require_relative "rules"
 
 class Game
-  GO_SALARY = 1  # Money awarded when passing GO
+  # Default player configuration (can be overridden)
+  DEFAULT_PLAYERS = ["Peter", "Billy", "Charlotte", "Sweedal"]
 
-  def initialize(board_file, rolls_file)
+  # Configurable game settings
+  CONFIG = {
+    go_salary: 1
+  }
+
+  def initialize(board_file, rolls_file, player_names = DEFAULT_PLAYERS)
     @board = Board.new(board_file)
     @rolls = load_rolls(rolls_file)
-    @players = init_players
+    @players = init_players(player_names)
     @current_roll_index = 0
     @game_over = false
   end
@@ -40,9 +50,9 @@ class Game
     JSON.parse(File.read(file))
   end
 
-  # Initialize players
-  def init_players
-    ["Peter", "Billy", "Charlotte", "Sweedal"].map { |name| Player.new(name) }
+  # Initialize players dynamically
+  def init_players(player_names)
+    player_names.map { |name| Player.new(name) }
   end
 
   # Execute a single player's turn
@@ -52,7 +62,7 @@ class Game
 
     # Move player and check if GO is passed
     passed_go = player.move(roll, @board.size)
-    player.money += GO_SALARY if passed_go
+    player.money += CONFIG[:go_salary] if passed_go
 
     current_space = @board.space_at(player.position)
 
@@ -75,17 +85,12 @@ class Game
     end
   end
 
-  # Handle rent payment between players
+  # Handle rent payment using Rules module
   def handle_rent(player, property)
     owner = property.owner
     return if owner == player
 
-    rent = property.price
-
-    # Double rent if owner has full set
-    if owns_full_set?(owner, property.colour)
-      rent *= 2
-    end
+    rent = Rules.calculate_rent(property, @board)
 
     success = player.pay(rent, owner)
 
@@ -94,12 +99,6 @@ class Game
       @game_over = true
       return
     end
-  end
-
-  # Check if player owns all properties of a colour
-  def owns_full_set?(player, colour)
-    properties = @board.properties_by_colour(colour)
-    properties.all? { |p| p.owner == player }
   end
 
   # Determine winner (highest money)
