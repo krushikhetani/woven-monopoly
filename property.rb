@@ -1,3 +1,5 @@
+# Represents a property on the board
+
 class Property
   attr_reader :name, :price, :colour, :type
   attr_accessor :owner
@@ -10,6 +12,7 @@ class Property
     @owner = nil
   end
 
+  # Check if property is owned
   def owned?
     !@owner.nil?
   end
